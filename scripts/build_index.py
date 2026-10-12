@@ -5,9 +5,10 @@
 数据源两类：
   * sources.json —— {"modules": [{"id": "...", "repo": "owner/name"}]}
     取该仓库**最新 Release** 里的 zip 资产（模块作者自己的仓库，zip 直链指向他自己的 Release）。
-  * hosted.json  —— {"modules": [{"id": "...", "tag": "...", "asset": "...", "versionCode": N,
-                                   "sha256": "...", "size": N}]}
-    取**本仓库** Release 里的 zip 资产（用户没有自己的仓库时，我们把 zip 收进来托管）。
+  * hosted.json  —— {"modules": [{"id": "...", "path": "modules/<id>/<file>.zip",
+                                   "versionCode": N, "sha256": "...", "size": N}]}
+    取**本仓库里的 zip 文件**（用户没有自己的仓库时，我们把 zip 收进来托管）。
+    直链给 jsDelivr（国内一般可达），github.com 直链只作记录。
 
 name / summary / versionCode 一律以 zip 里 module.prop 的实际内容为准 —— 索引和模块本体
 对不上是最容易出的坑（作者改了 prop 忘了改索引）。zip 打不开或没有 module.prop 就跳过并打印原因，
@@ -69,6 +70,19 @@ def read_module_prop(blob):
         if not names:
             return None
         return parse_prop(zf.read(sorted(names, key=len)[0]).decode('utf-8', 'replace'))
+
+
+def git_last_commit_time(rel):
+    """文件最后一次提交时间（ISO8601）。用 git 而不是文件 mtime：CI checkout 的 mtime 没意义。"""
+    import subprocess
+    try:
+        out = subprocess.check_output(
+            ['git', '-C', str(ROOT), 'log', '-1', '--format=%cI', '--', rel],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        return out
+    except Exception:                                              # noqa: BLE001
+        return ''
 
 
 def load_json(name, default):
@@ -153,33 +167,36 @@ def build_from_sources(entries):
 def build_from_hosted(entries):
     for item in load_json('hosted.json', {'modules': []}).get('modules', []):
         module_id = (item.get('id') or '').strip()
-        tag = (item.get('tag') or '').strip()
-        asset = (item.get('asset') or '').strip()
-        if not (module_id and tag and asset):
+        rel = (item.get('path') or '').strip()
+        if not (module_id and rel):
             print('skip: incomplete hosted entry: %r' % item)
             continue
-        url = 'https://github.com/%s/releases/download/%s/%s' % (REPO, tag, asset)
-        try:
-            release = api('/repos/%s/releases/tags/%s' % (REPO, tag))
-            blob = download(url)
-        except Exception as exc:                                   # noqa: BLE001
-            print('skip hosted %s: %s' % (module_id, exc))
+        blob_path = ROOT / rel
+        if not blob_path.is_file():
+            print('skip hosted %s: %s missing in checkout' % (module_id, rel))
+            continue
+        blob = blob_path.read_bytes()
+        digest = hashlib.sha256(blob).hexdigest()
+        if item.get('sha256') and item['sha256'] != digest:
+            print('skip hosted %s: sha256 mismatch (hosted.json=%s actual=%s)'
+                  % (module_id, item['sha256'][:12], digest[:12]))
             continue
         prop = read_module_prop(blob)
         if not prop or not prop.get('id'):
             print('skip hosted %s: no usable module.prop' % module_id)
             continue
+        stamp = git_last_commit_time(rel) or ''
         entries.append(entry_from(
             prop,
             module_id=module_id,
-            download_url=url,
+            download_url='https://cdn.jsdelivr.net/gh/%s@main/%s' % (REPO, rel),
             version_code=item.get('versionCode') or prop.get('versionCode', 0),
-            release_time=release.get('published_at') or '',
-            created_at=release.get('created_at') or '',
+            release_time=stamp,
+            created_at=stamp,
             stars=0,
             link='https://github.com/%s' % REPO,
         ))
-        print('ok   hosted %s (%s)' % (module_id, asset))
+        print('ok   hosted %s (%s, %d bytes)' % (module_id, rel, len(blob)))
 
 
 def main():
