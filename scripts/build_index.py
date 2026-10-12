@@ -80,7 +80,11 @@ def git_last_commit_time(rel):
             ['git', '-C', str(ROOT), 'log', '-1', '--format=%cI', '--', rel],
             stderr=subprocess.DEVNULL,
         ).decode().strip()
-        return out
+        if not out:
+            return ''
+        # 统一成 UTC + Z：管理器是按字符串倒序排 updatedAt 的，混着 +08:00 会排错。
+        from datetime import datetime, timezone
+        return datetime.fromisoformat(out).astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     except Exception:                                              # noqa: BLE001
         return ''
 
