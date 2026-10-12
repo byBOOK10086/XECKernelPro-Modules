@@ -36,3 +36,8 @@ jobs:
           git add modules.json
           git commit -m "index: rebuild modules.json"
           git push
+
+      - name: Purge jsDelivr cache
+        # 不清缓存的话 CDN 会拿着旧的 modules.json 顶 12 小时，管理器看到的就一直是老列表。
+        run: |
+          curl -sS -m 30 "https://purge.jsdelivr.net/gh/byBOOK10086/XECKernelPro-Modules@main/modules.json" || true
