@@ -2,8 +2,7 @@
   "modules": [
     {
       "id": "xecpro-sample",
-      "tag": "xecpro-sample-v1",
-      "asset": "xecpro-sample-1.zip",
+      "path": "modules/xecpro-sample/xecpro-sample-1.zip",
       "versionCode": 1,
       "sha256": "53f6ce8ced2e1a75b0ce7a135809ffeccb041bb1bf62753d06d1ebbb8dd2f386",
       "size": 1434
