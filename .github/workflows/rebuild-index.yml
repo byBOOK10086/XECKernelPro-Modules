@@ -1,0 +1,38 @@
+name: Rebuild module index
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'sources.json'
+      - 'hosted.json'
+      - 'scripts/build_index.py'
+      - '.github/workflows/rebuild-index.yml'
+  schedule:
+    - cron: '17 */6 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rebuild modules.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/build_index.py
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- modules.json; then
+            echo "modules.json unchanged"
+            exit 0
+          fi
+          git config user.name "xecpro-modrepo-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add modules.json
+          git commit -m "index: rebuild modules.json"
+          git push
