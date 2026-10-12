@@ -8,6 +8,7 @@
 
 校验不过就**不写任何东西**并原样把原因回帖，避免索引里出现假条目。
 """
+import base64
 import hashlib
 import io
 import json
@@ -16,6 +17,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -62,17 +64,25 @@ def pick(fields, *needles):
     return ''
 
 
-def upload_asset(release, name, blob):
-    """Release 资产必须发到 uploads.github.com，且要带 Content-Type。"""
-    url = ('https://uploads.github.com/repos/%s/releases/%s/assets?name=%s'
-           % (REPO, release['id'], urllib.parse.quote(name)))
-    req = urllib.request.Request(url, data=blob, method='POST')
-    req.add_header('Authorization', 'Bearer ' + TOKEN)
-    req.add_header('Accept', 'application/vnd.github+json')
-    req.add_header('User-Agent', UA)
-    req.add_header('Content-Type', 'application/zip')
-    with urllib.request.urlopen(req, timeout=600) as resp:
-        return json.loads(resp.read())
+def put_contents(path, blob, message):
+    """把 zip 作为仓库文件写进去（jsDelivr 能直接发这个文件，Release 资产则只有 github.com 直链）。"""
+    url_path = '/repos/%s/contents/%s' % (REPO, urllib.parse.quote(path))
+    payload = {
+        'message': message,
+        'content': base64.b64encode(blob).decode('ascii'),
+        'branch': 'main',
+    }
+    request = urllib.request.Request(API + url_path + '?ref=main')
+    request.add_header('Authorization', 'Bearer ' + TOKEN)
+    request.add_header('Accept', 'application/vnd.github+json')
+    request.add_header('User-Agent', UA)
+    try:
+        with urllib.request.urlopen(request, timeout=60) as resp:
+            payload['sha'] = json.loads(resp.read())['sha']
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+    api(url_path, 'PUT', payload)
 
 
 def register_source(repo):
@@ -159,31 +169,16 @@ def main():
         return fail('module.prop 的 versionCode 不是整数：%r' % prop['versionCode'])
 
     sha = hashlib.sha256(blob).hexdigest()
-    tag = '%s-v%d' % (module_id, version_code)
-    try:
-        api('/repos/%s/releases/tags/%s' % (REPO, tag))
-        tag = '%s-v%d-%s' % (module_id, version_code, sha[:8])      # 同版本重发不覆盖旧资产
-        print('tag exists, using %s' % tag)
-    except Exception:                                              # noqa: BLE001
-        pass
-
-    asset_name = '%s-%d.zip' % (module_id, version_code)
-    print('creating release %s' % tag)
-    release = api('/repos/%s/releases' % REPO, 'POST', {
-        'tag_name': tag,
-        'name': '%s %s' % (prop.get('name', module_id), prop.get('version', version_code)),
-        'body': (prop.get('description', '') + '\n\n'
-                 'sha256: `%s`\n\n由模块作者通过 issue 上传。' % sha).strip(),
-    })
-    upload_asset(release, asset_name, blob)
-    print('asset uploaded: %s (%d bytes)' % (asset_name, len(blob)))
+    rel = 'modules/%s/%s-%d.zip' % (module_id, module_id, version_code)
+    put_contents(rel, blob, 'repo: %s v%s (versionCode %d)'
+                 % (module_id, prop.get('version', version_code), version_code))
+    print('stored %s (%d bytes, sha256 %s)' % (rel, len(blob), sha[:12]))
 
     hosted_path = ROOT / 'hosted.json'
     hosted = json.loads(hosted_path.read_text(encoding='utf-8')) if hosted_path.is_file() else {'modules': []}
     entry = {
         'id': module_id,
-        'tag': tag,
-        'asset': asset_name,
+        'path': rel,
         'versionCode': version_code,
         'sha256': sha,
         'size': len(blob),
@@ -201,10 +196,10 @@ def main():
         try:
             api('/repos/%s/issues/%s/comments' % (REPO, issue), 'POST', {
                 'body': ('✅ 收下了：`%s` v%s（versionCode %d）\n\n'
-                         '直链：https://github.com/%s/releases/download/%s/%s\n\n'
+                         '直链：https://cdn.jsdelivr.net/gh/%s@main/%s\n\n'
                          '索引已重建，管理器刷新一下就能看到。'
                          % (module_id, prop.get('version', version_code), version_code,
-                            REPO, tag, asset_name)),
+                            REPO, rel)),
             })
             api('/repos/%s/issues/%s' % (REPO, issue), 'PATCH', {'state': 'closed'})
         except Exception as exc:                                   # noqa: BLE001
