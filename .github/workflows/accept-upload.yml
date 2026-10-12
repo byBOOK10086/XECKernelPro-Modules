@@ -1,0 +1,53 @@
+name: Accept module upload
+
+# 用户开 issue 提交模块（表单见 .github/ISSUE_TEMPLATE/upload-module.yml），
+# 或者维护者手动 workflow_dispatch 传一个 zip 直链。
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: '模块 zip 直链（方式二）'
+        required: false
+      repo:
+        description: '模块作者的 GitHub 仓库 owner/repo（方式一）'
+        required: false
+      id:
+        description: '模块 ID（留空则读 module.prop）'
+        required: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  accept:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(join(github.event.issue.labels.*.name, ','), 'module-submission')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate and accept
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          INPUT_URL: ${{ inputs.url }}
+          INPUT_REPO: ${{ inputs.repo }}
+          INPUT_ID: ${{ inputs.id }}
+        run: python3 scripts/accept_upload.py
+
+      - name: Commit index changes
+        run: |
+          if git diff --quiet -- sources.json hosted.json modules.json; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          git config user.name "xecpro-modrepo-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add sources.json hosted.json modules.json
+          git commit -m "repo: accept module submission"
+          git push
