@@ -1,0 +1,54 @@
+name: 上传 / 登记模块
+description: 让模块出现在 XECKernelPro 管理器的「模块仓库」列表里
+title: "[模块] "
+labels: ["module-submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        两种方式**任选其一**（另一栏留空即可）：
+
+        1. **我有 GitHub 仓库**：把模块 zip 发到你自己仓库的 Release，下面第一栏填 `owner/repo`；
+           通过后 zip 直链指向你自己的 Release，索引按你每次发版自动更新。
+        2. **我有 zip 直链**：第二栏填一个能直接下载到 zip 的 http(s) 地址，
+           机器人会校验 `module.prop`，把 zip 收进本仓库的 Release 再更新索引。
+
+        校验要求：`module.prop` 里 `id` 合法（`^[a-zA-Z][a-zA-Z0-9._-]+$`）、`name`、`version`、
+        `versionCode`（整数）都不为空。
+  - type: input
+    id: repo
+    attributes:
+      label: GitHub 仓库（方式一）
+      description: 形如 owner/repo，且最新 Release 里有 .zip 资产
+      placeholder: owner/repo
+    validations:
+      required: false
+  - type: input
+    id: url
+    attributes:
+      label: zip 直链（方式二）
+      description: http(s) 开头、能直接下载到 zip
+      placeholder: https://example.com/my-module.zip
+    validations:
+      required: false
+  - type: input
+    id: module_id
+    attributes:
+      label: 模块 ID（可留空）
+      description: 留空则从 zip 里的 module.prop 读取
+    validations:
+      required: false
+  - type: textarea
+    id: note
+    attributes:
+      label: 备注
+      description: 模块是干什么的、有没有特殊依赖，随便写
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 我是这个模块的作者，或已获得作者许可在这里分发
+          required: true
