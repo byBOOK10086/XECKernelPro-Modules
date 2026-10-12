@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "moduleId": "xecpro-sample",
+    "moduleName": "XEC 示例模块（模板）",
+    "authors": [
+      {
+        "name": "XECKernelPro",
+        "link": "https://github.com/byBOOK10086/XECKernelPro-Modules"
+      }
+    ],
+    "summary": "示例/模板模块：开机写一行日志，用来验证模块仓库与 magic mount 链路是通的。可以直接照这个结构改成你自己的模块。",
+    "metamodule": false,
+    "stargazerCount": 0,
+    "updatedAt": "2026-10-12T16:53:05Z",
+    "createdAt": "2026-10-12T16:52:33Z",
+    "latestRelease": {
+      "name": "1.0",
+      "time": "2026-10-12T16:53:05Z",
+      "versionCode": 1,
+      "downloadUrl": "https://github.com/byBOOK10086/XECKernelPro-Modules/releases/download/xecpro-sample-v1/xecpro-sample-1.zip"
+    }
+  }
+]
