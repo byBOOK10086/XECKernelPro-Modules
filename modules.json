@@ -11,11 +11,11 @@
     "summary": "示例/模板模块：开机写一行日志，用来验证模块仓库与 magic mount 链路是通的。可以直接照这个结构改成你自己的模块。",
     "metamodule": false,
     "stargazerCount": 0,
-    "updatedAt": "2026-10-14T11:51:08Z",
-    "createdAt": "2026-10-14T11:51:08Z",
+    "updatedAt": "2026-10-14T17:10:08Z",
+    "createdAt": "2026-10-14T17:10:08Z",
     "latestRelease": {
       "name": "1.0",
-      "time": "2026-10-14T11:51:08Z",
+      "time": "2026-10-14T17:10:08Z",
       "versionCode": 1,
       "downloadUrl": "https://cdn.jsdelivr.net/gh/byBOOK10086/XECKernelPro-Modules@main/modules/xecpro-sample/xecpro-sample-1.zip"
     }
