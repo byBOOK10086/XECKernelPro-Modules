@@ -106,7 +106,7 @@ def split_authors(value, link):
 
 
 def entry_from(prop, *, module_id, download_url, version_code, release_time, created_at,
-               stars, link):
+               stars, link, sha256=''):
     return {
         'moduleId': prop.get('id') or module_id,
         'moduleName': prop.get('name') or (prop.get('id') or module_id),
@@ -121,6 +121,8 @@ def entry_from(prop, *, module_id, download_url, version_code, release_time, cre
             'time': release_time,
             'versionCode': int(prop.get('versionCode') or version_code or 0),
             'downloadUrl': download_url,
+            # 管理器下载 zip 后按它校验一次（中转被替换/传输被截断能当场发现）。
+            'sha256': sha256,
         },
     }
 
@@ -143,13 +145,16 @@ def build_from_sources(entries):
             continue
         asset = assets[0]
         try:
-            prop = read_module_prop(download(asset['browser_download_url']))
+            blob = download(asset['browser_download_url'])
+            prop = read_module_prop(blob)
         except Exception as exc:                                   # noqa: BLE001
             print('skip %s: %s' % (repo, exc))
             continue
         if not prop or not prop.get('id'):
             print('skip %s: no usable module.prop in %s' % (repo, asset['name']))
             continue
+        # sha256 以**下载到的实际字节**为准（GitHub 的 asset digest 有时缺字段/有时是别的算法）。
+        digest = hashlib.sha256(blob).hexdigest()
         module_id = item.get('id') or prop['id']
         if item.get('id') and item['id'] != prop['id']:
             print('warn %s: sources.json id=%s but module.prop id=%s (using prop id)'
@@ -164,6 +169,7 @@ def build_from_sources(entries):
             created_at=meta.get('created_at') or '',
             stars=meta.get('stargazers_count', 0),
             link='https://github.com/%s' % repo,
+            sha256=digest,
         ))
         print('ok   %s -> %s (%s)' % (repo, module_id, asset['name']))
 
@@ -199,6 +205,7 @@ def build_from_hosted(entries):
             created_at=stamp,
             stars=0,
             link='https://github.com/%s' % REPO,
+            sha256=digest,
         ))
         print('ok   hosted %s (%s, %d bytes)' % (module_id, rel, len(blob)))
 
